@@ -1,53 +1,105 @@
-name: "CodeQL (Maven Manual Build)"
+name: CI Build
 
 on:
   push:
-    branches: [ "main" ]
+    branches: [ main ]
   pull_request:
-    branches: [ "main" ]
-  schedule:
-    - cron: '19 11 * * 6'
+    branches: [ main ]
+  # Optional scheduled security scans
+  # schedule:
+  #   - cron: '0 5 * * 1'
 
 jobs:
-  analyze:
+  # 1) Build both modules (Maven + Gradle)
+  build:
+    name: Build All (initial & complete)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout source code
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+          cache: 'maven'
+
+      # ----- initial -----
+      - name: Build initial with Maven
+        working-directory: ./initial
+        run: |
+          if [ -x "./mvnw" ]; then ./mvnw -B -DskipTests package; else mvn -B -DskipTests package; fi
+
+      - name: Build initial with Gradle
+        working-directory: ./initial
+        run: |
+          if [ -x "./gradlew" ]; then ./gradlew build -x test; else gradle -p . build -x test; fi
+
+      # ----- complete -----
+      - name: Build complete with Maven
+        working-directory: ./complete
+        run: |
+          if [ -x "./mvnw" ]; then ./mvnw -B -DskipTests package; else mvn -B -DskipTests package; fi
+
+      - name: Build complete with Gradle
+        working-directory: ./complete
+        run: |
+          if [ -x "./gradlew" ]; then ./gradlew build -x test; else gradle -p . build -x test; fi
+
+  # 2) CodeQL (one run per module; prune others to avoid duplicate FQNs)
+  codeql:
+    name: CodeQL (Java/Kotlin)
     runs-on: ubuntu-latest
     permissions:
       actions: read
       contents: read
       security-events: write
       packages: read
-
     strategy:
       fail-fast: false
       matrix:
         include:
-          - language: java-kotlin
-            build-mode: manual
+          - module: initial
+          - module: complete
 
     steps:
-      - name: Checkout repository
+      - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Set up Java
+      - name: Set up JDK 17
         uses: actions/setup-java@v4
         with:
           distribution: temurin
-          java-version: '17' # or 11/8 to match your pom
+          java-version: '17'
+          cache: 'maven'
+
+      # Keep only the current module to prevent duplicate class names during extraction
+      - name: Prune to module "${{ matrix.module }}"
+        shell: bash
+        run: |
+          shopt -s dotglob
+          for d in initial complete; do
+            if [ "$d" != "${{ matrix.module }}" ] && [ -d "$d" ]; then rm -rf "$d"; fi
+          done
 
       - name: Initialize CodeQL
         uses: github/codeql-action/init@v4
         with:
-          languages: ${{ matrix.language }}
-          build-mode: ${{ matrix.build-mode }}
-          config-file: ./.github/codeql/codeql-config.yml
-          # optional: queries: security-extended
+          languages: java-kotlin
+          # queries: security-extended   # uncomment to focus on security rules
+          # queries: security-and-quality
 
-      # Build only the desired module/folder:
-      - name: Build with Maven (module)
-        working-directory: complete
-        run: mvn -B -DskipTests package
+      # Build with Maven (one build is enough for CodeQL)
+      - name: Build module with Maven
+        run: |
+          if [ -x "./${{ matrix.module }}/mvnw" ]; then
+            (cd "${{ matrix.module }}" && ./mvnw -B -DskipTests package)
+          else
+            mvn -B -f "${{ matrix.module }}/pom.xml" -DskipTests package
+          fi
 
       - name: Perform CodeQL Analysis
         uses: github/codeql-action/analyze@v4
         with:
-          category: "/language:${{ matrix.language }}"
+          category: "/language:java"
