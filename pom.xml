@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+
+    <modelVersion>4.0.0</modelVersion>
+
+    <!-- Coordinates for the parent / aggregator project -->
+    <groupId>com.example</groupId>
+    <artifactId>serving-web-content-parent</artifactId>
+    <version>0.0.1-SNAPSHOT</version>
+    <packaging>pom</packaging>
+
+    <name>serving-web-content-parent</name>
+    <description>Multi-module project for serving web content (initial + complete)</description>
+
+    <properties>
+        <java.version>17</java.version>
+
+        <!-- SonarCloud organization (shared by all modules) -->
+        <sonar.organization>research-projects-all</sonar.organization>
+
+        <!-- Optional but nice to have -->
+        <maven.compiler.source>${java.version}</maven.compiler.source>
+        <maven.compiler.target>${java.version}</maven.compiler.target>
+    </properties>
+
+    <!-- List of Maven modules in this repo -->
+    <modules>
+        <module>initial</module>
+        <module>complete</module>
+    </modules>
+
+</project>
